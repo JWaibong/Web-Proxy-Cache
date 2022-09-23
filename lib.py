@@ -1,5 +1,12 @@
 import os
+import socket
 
+def resolve_url_as_ipv4(url: str) -> str:
+    ip = ""
+
+    
+
+    return ip
 class HTTPRequest:
     def __init__(self, req):
         
