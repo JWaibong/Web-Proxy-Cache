@@ -1,6 +1,6 @@
 
 from socket import *
-from lib import HTTPRequest
+from lib import HTTPRequest #my own code
 import sys
 def main():
 
