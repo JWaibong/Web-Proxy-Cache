@@ -1,14 +1,12 @@
 
-from http import client, server
 from socket import *
-#from os import getcwd
-from lib import HTTPRequest, HTTPResponse
-
-import requests
+from lib import HTTPRequest
+import sys
 def main():
 
     cache = {}
     port = 8888
+
 
     serverSock = socket(AF_INET, SOCK_STREAM)
     serverSock.bind(("127.0.0.1", port))
@@ -19,50 +17,66 @@ def main():
         msg = connSock.recv(2048).decode("utf-8")
 
         req = HTTPRequest(msg)
-        #connSock.send(res.res.encode())
+        url = req.url
+
+        if len(url) > 1:
+            url = url[1:]
+
+        if url.startswith("http://"):
+            url = url[7:]
+        if url.startswith("www."):
+            url = url[4:]
+
+        tokens = url.split("/") 
+        
+        resource = ""
+        if len(tokens) <= 1:
+            resource = ""
+        else:
+            url = tokens[0]
+            resource = '/'.join(tokens[1:]) #for example www.google.com/a/b/c/index.html => /a/b/c/index.html 
+
+        if url == "favicon.ico":
+            print("Cannot handle favicon.ico request", file=sys.stderr)
+            connSock.close()
+            continue
+
+        print(url+"/"+resource)
+        #strip off "http://" and "www." from the url
         if req.type == "GET":
-            if req.url in cache:
+            if url+"/"+resource in cache:
 
+                print("Requested file found in cache: {}".format(url+"/"+resource), file=sys.stderr)
+                connSock.send(cache[url+"/"+resource])
+                connSock.close()
+            else: #need to make an explicit request
+                try:
+                    ip = gethostbyname(url)
+                    newReq = "GET /{} HTTP/1.1\r\nHost: {}\r\nAccept: text/html \r\n\r\n".format(resource, url)
 
-                return 
-            else: #need to make an explicit request 
-                #print(req.url[1:])
-                #https://stackoverflow.com/questions/22492484/how-do-i-get-the-ip-address-from-a-http-request-using-the-requests-library?noredirect=1&lq=1
-                url = req.url[1:]
+                    clientSock = socket(AF_INET, SOCK_STREAM)
+                    clientSock.connect((ip, 80))
+                    clientSock.send(newReq.encode())
+                    msg = b""
+                    while True:
+                        bytes = clientSock.recv(4096)
+                        msg += bytes
+                        if len(bytes) < 4096:
+                            break
+                        
 
-                startsWithHTTP = True
-                if not url.startswith("http://"):
-                    startsWithHTTP = False
+                    print("response received: {}".format(url+"/"+resource), file=sys.stderr)
+                    #print(msg.decode("utf-8"), file=sys.stderr)
 
+                    cache[url+"/"+resource] = msg
 
-                tokens = url.split("/") if not startsWithHTTP else url[7:].split("/")
-
-                if not startsWithHTTP:
-                    url = "http://" + url
-                
-                resource = ""
-                if len(tokens) <= 1:
-                    resource = "/"
-                else:
-                    resource = '/'.join(tokens[1:]) #for example www.google.com/a/b/c/index.html => /a/b/c/index.html 
-
-                
-                getIP = requests.get(url, stream=True)
-                
-                ip, port = getIP.raw._connection.sock.getsockname()
-                print(ip)
-                newReq = "GET {} HTTP/1.1\r\n".format(resource)
-                print(newReq)
-                print(url)
-
-                clientSock = socket(AF_INET, SOCK_STREAM)
-                clientSock.connect((ip, 80))
-                clientSock.send(newReq)
-
-                msg = clientSock.recv(2048)
-                print(msg.decode("encoding=utf-8"))
-                #connSock.close()
-                #serverSock.close()
+                    clientSock.close()
+                    connSock.send(msg)
+                    connSock.close()
+                except:
+                    print("Could not resolve host ip adddress", file=sys.stderr)
+                    connSock.close()
+                    continue
         else: 
             print("Unimplemented handling for this http request type lol")
         
