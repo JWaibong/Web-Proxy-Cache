@@ -4,7 +4,7 @@ from lib import HTTPRequest
 import sys
 def main():
 
-    cache = {}
+    cache = {} # cache internally represented as hashmap from string to bytes
     port = 8888
 
 
@@ -16,12 +16,13 @@ def main():
         print("Connected to " + str(addr))
         msg = connSock.recv(2048).decode("utf-8")
 
-        req = HTTPRequest(msg)
+        req = HTTPRequest(msg) # parse the info from the http request
         url = req.url
 
         if len(url) > 1:
             url = url[1:]
 
+        #strip off "http://" and "www." from the url
         if url.startswith("http://"):
             url = url[7:]
         if url.startswith("www."):
@@ -30,49 +31,49 @@ def main():
         tokens = url.split("/") 
         
         resource = ""
-        if len(tokens) <= 1:
-            resource = ""
-        else:
-            url = tokens[0]
-            resource = '/'.join(tokens[1:]) #for example www.google.com/a/b/c/index.html => /a/b/c/index.html 
-
+        if len(tokens) > 1:
+            # separate the beginning part of the url from the resource part
+            #for example for google.com/a/b/c/index.html
+            url = tokens[0] # => url == "google.com"
+            resource = '/'.join(tokens[1:]) #=> resource == "/a/b/c/index.html"
+        
         if url == "favicon.ico":
-            print("Cannot handle favicon.ico request", file=sys.stderr)
+            print("Cannot handle favicon.ico request", file=sys.stderr) 
             connSock.close()
             continue
 
-        print(url+"/"+resource)
-        #strip off "http://" and "www." from the url
+        completeURL = "{}/{}".format(url, resource) # join URL back together so we can search for it in the cache (hashmap)
+        print(completeURL)
         if req.type == "GET":
-            if url+"/"+resource in cache:
+            if completeURL in cache:
 
-                print("Requested file found in cache: {}".format(url+"/"+resource), file=sys.stderr)
-                connSock.send(cache[url+"/"+resource])
+                print("Requested file found in cache: {}".format(completeURL), file=sys.stderr)
+                connSock.send(cache[completeURL]) # send the cached HTTP response (real server would make a new response and store only the file in cache)
                 connSock.close()
             else: #need to make an explicit request
                 try:
-                    ip = gethostbyname(url)
-                    newReq = "GET /{} HTTP/1.1\r\nHost: {}\r\nAccept: text/html \r\n\r\n".format(resource, url)
+                    ip = gethostbyname(url) # this can fail and raise an exception
+                    newReq = "GET /{} HTTP/1.1\r\nHost: {}\r\nAccept: */* \r\n\r\n".format(resource, url)
 
-                    clientSock = socket(AF_INET, SOCK_STREAM)
-                    clientSock.connect((ip, 80))
+                    clientSock = socket(AF_INET, SOCK_STREAM) 
+                    clientSock.connect((ip, 80)) # create a socket and connect with the server specified by URL in client's request
                     clientSock.send(newReq.encode())
                     msg = b""
                     while True:
-                        bytes = clientSock.recv(4096)
+                        bytes = clientSock.recv(4096) # read from the socket 4096 bytes at a time
                         msg += bytes
-                        if len(bytes) < 4096:
+                        if len(bytes) < 4096: # reading < 4096 bytes means there's nothing left to read 
                             break
                         
 
                     print("response received: {}".format(url+"/"+resource), file=sys.stderr)
-                    #print(msg.decode("utf-8"), file=sys.stderr)
+                    #print(msg.decode("utf-8"), file=sys.stderr) # uncommented because the entire http response can be huge
 
-                    cache[url+"/"+resource] = msg
+                    cache[completeURL] = msg #cache the http response, file included
 
-                    clientSock.close()
+                    clientSock.close() 
                     connSock.send(msg)
-                    connSock.close()
+                    connSock.close() #close both sockets
                 except:
                     print("Could not resolve host ip adddress", file=sys.stderr)
                     connSock.close()
