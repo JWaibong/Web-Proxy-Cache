@@ -1,6 +1,4 @@
-Testing was done on WSL Ubuntu to run the python files and Google Chrome as the client browser
-
-All testing was done using Google Chrome. Python files ran in WSL Ubuntu
+Testing was done on WSL Ubuntu with Google Chrome as the client browser. The version of python used was 3.8.10
 
 To run part A (sudo was necessary for me in order for the process to gain network capabilities): 
 ```sudo python3 webserver.py```
