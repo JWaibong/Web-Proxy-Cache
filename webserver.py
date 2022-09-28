@@ -1,6 +1,6 @@
 import os
 from socket import *
-from lib import HTTPRequest, HTTPResponse  #my own code
+from lib import HTTPRequest, HTTPResponse  # my own code found in lib.py
 
 def main():
 
